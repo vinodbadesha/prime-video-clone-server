@@ -5,6 +5,8 @@ app.use(express.json())
 
 const {open} = require("sqlite")
 const sqlite3 = require("sqlite3")
+const bcrypt = require("bcrypt")
+const jwt = require("jsonwebtoken")
 
 const dbPath = path.join(__dirname, "primeVideo.db")
 
@@ -28,24 +30,50 @@ const initializeDbAndStartServer = async () => {
 
 initializeDbAndStartServer()
 
-// API to get the users data
-app.get("/login", async (request, response) => {
-    const getLoginData = `
-        SELECT name, email FROM users;
-    `
-    const allUsers = await db.all(getLoginData)
-    response.send(allUsers)
+// API to register a new user
+app.post("/register/", async (request, response) => {
+    const {username, email, password, phoneNumber} = request.body
+    const userData = `SELECT * FROM users WHERE email = "${email}"`
+
+    const userResponse = await db.get(userData)
+
+    if (userResponse !== undefined){
+        response.status(400)
+        response.send("User already exists!!!")
+    }
+    else{    
+        const hashedPassword = await bcrypt.hash(password, 10)
+        const insertUserQuery = `
+            INSERT INTO users(username, email, password, phone_number)
+            VALUES("${username}", "${email}", "${hashedPassword}", "${phoneNumber}");
+        `
+
+        await db.run(insertUserQuery)
+        response.send("User created successfully")
+    }
 })
 
-// API to register a new user
-app.post("/register", async (request, response) => {
-    const {name, email, hashedPassword, phoneNumber} = request.body
-    const registerUser = `
-        INSERT INTO users(name, email, hashed_password, phone_number)
-        VALUES (
-            "${name}", "${email}", "${hashedPassword}", "${phoneNumber}"
-        );
-    `
-    await db.run(registerUser)
-    response.send("User added successfully")
+// API to login the user
+app.post("/login/", async (request, response) => {
+    const {email, password} = request.body
+    const userData = `SELECT * FROM users WHERE email = "${email}"`
+    const userDataResponse = await db.get(userData)
+
+    if (userDataResponse !== undefined){
+        const isPasswordCorrect = await bcrypt.compare(password, userDataResponse.password)
+
+        if (isPasswordCorrect){
+            const payload = {email, userId: userDataResponse.user_id}
+            const jwtToken = jwt.sign(payload, "SECRET")
+            response.send({jwtToken})
+        }
+        else{
+            response.status(400)
+            response.send("Invalid Password")
+        }
+    }
+    else{
+        response.status(400)
+        response.send("Invalid User")
+    }
 })

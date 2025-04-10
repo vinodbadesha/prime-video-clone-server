@@ -1,0 +1,12 @@
+GET http://localhost:4000/login
+
+
+POST http://localhost:4000/register/
+Content-Type: application/json
+
+{
+    "name": "Prashanth",
+    "email": "prashanth@gmail.com",
+    "hashed_password": "bharath@25",
+    "phone_number": "9876543210"
+}
